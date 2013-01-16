@@ -38,7 +38,7 @@ public class RobotPlayer{
 	private static void soldierCode() throws GameActionException{
 		while(true){
 			if(rc.hasUpgrade(Upgrade.PICKAXE)){
-				if(rc.senseMineLocations(rc.getLocation(), 1, rc.getTeam()).length>2)
+				if(rc.senseMineLocations(rc.getLocation(), 1, null).length>3)
 					moveRandomly();
 				else
 					rc.layMine();
