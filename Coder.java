@@ -1,4 +1,6 @@
-public class coder{
+package battlecode.communication;
+
+public class Coder{
 	// This will convert a 15 bit unsigned input to a 31 bit codeword
 
 	// input   : 15 bits
