@@ -1,4 +1,4 @@
-package simpleplayer;
+package team077;
 /**************************************************
   This is a really dumb player that researches the
   pickaxe, then maintains a minimum population
@@ -8,7 +8,7 @@ package simpleplayer;
 **************************************************/
 
 import battlecode.common.*;
-import battlecode.communication.*;
+// import battlecode.communication.*;
 import java.util.Random;
 
 public class RobotPlayer{
@@ -74,7 +74,7 @@ public class RobotPlayer{
 		Direction dir;
 		for(int i=1;i<8;++i){
 			dir = pickRandomDirection();
-			coinflip = numberGenerator.nextBoolean();	// Determines left or right
+			boolean coinflip = numberGenerator.nextBoolean();	// Determines left or right
 			if(rc.canMove(dir)){
 				MapLocation destination = rc.getLocation().add(dir);
 				if(rc.senseMine(destination)==rc.getTeam() || rc.senseMine(destination)==null){
