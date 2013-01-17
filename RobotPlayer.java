@@ -8,7 +8,7 @@ package team077;
 **************************************************/
 
 import battlecode.common.*;
-// import battlecode.communication.*;
+import battlecode.communication.*;
 import java.util.Random;
 
 public class RobotPlayer{
@@ -24,8 +24,7 @@ public class RobotPlayer{
 														  Direction.valueOf("SOUTH_EAST"),
 														  Direction.valueOf("NORTH_WEST"),
 														  Direction.valueOf("SOUTH_WEST")};
-								  
-		
+			
 	public static void run(RobotController myRC){
 		rc = myRC;
 		numberGenerator = new Random();
@@ -55,7 +54,7 @@ public class RobotPlayer{
 			// Otherwise, lay mines.
 			}else{
 				if(rc.hasUpgrade(Upgrade.PICKAXE)){
-					if(rc.senseMineLocations(rc.getLocation(), 1, null).length>3)
+					if(rc.senseMineLocations(rc.getLocation(), 1, null).length>2)
 						moveRandomly();
 					else
 						rc.layMine();
@@ -130,6 +129,7 @@ public class RobotPlayer{
 		}
 		
 		// Generate more robots whenever there are fewer than 20.
+		// Research vision if we have at least 3 artillery.
 		// Otherwise, research nuke.
 		while(true){
 			if(rc.senseNearbyGameObjects(Robot.class, 1000000, rc.getTeam()).length<20 &&
@@ -140,7 +140,10 @@ public class RobotPlayer{
 						break;
 					}
 				}
+			}else if(rc.senseAlliedEncampmentSquares().length>0 && !rc.hasUpgrade(Upgrade.VISION)){
+				rc.researchUpgrade(Upgrade.VISION);
 			}else{
+				rc.setIndicatorString(1,String.valueOf(rc.senseAlliedEncampmentSquares().length));
 				rc.researchUpgrade(Upgrade.NUKE);
 			}
 			hold();

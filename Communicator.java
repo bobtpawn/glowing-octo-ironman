@@ -40,6 +40,7 @@ package battlecode.communication;
 import battlecode.common.Clock;
 import battlecode.common.GameConstants;
 import battlecode.common.RobotController;
+import battlecode.common.GameActionException;
 
 public class Communicator{
 	private static final int teamID    = 27356;
