@@ -38,6 +38,8 @@ public class RobotPlayer{
 				artilleryCode();
 			}else if(rc.getType()==RobotType.SUPPLIER){
 				supplierCode();
+			}else if(rc.getType()==RobotType.GENERATOR){
+				generatorCode();
 			}else{
 				hqCode();
 			}
@@ -72,17 +74,7 @@ public class RobotPlayer{
 				makeEncampment();
 			// Otherwise, lay mines.
 			}else{
-				if(rc.hasUpgrade(Upgrade.PICKAXE)){
-					if(rc.senseMineLocations(rc.getLocation(), 1, null).length>2)
-						moveRandomly();
-					else
-						rc.layMine();
-				}else{
-					if(rc.senseMine(rc.getLocation()) != null)
-						moveRandomly();
-					else
-						rc.layMine();
-				}
+				buildMine();
 			}
 			hold();
 		}	
@@ -128,6 +120,25 @@ public class RobotPlayer{
 		}
 		
 		makeEncampment();
+		// We shouldn't get here, but if we do, just act like a regular soldier
+		soldierCode();
+	}
+	
+	private static void buildMine() throws GameActionException{
+		if(isOutOfTheWay()){
+			// No point in building a mine here, so move along.
+			moveRandomly();
+		}else if(rc.hasUpgrade(Upgrade.PICKAXE)){
+			if(rc.senseMineLocations(rc.getLocation(), 1, null).length>2)
+				moveRandomly();
+			else	
+				rc.layMine();
+		}else{
+			if(rc.senseMine(rc.getLocation()) != null)
+				moveRandomly();
+			else
+				rc.layMine();
+		}
 	}
 	
 	private static void attack() throws GameActionException{
@@ -138,16 +149,36 @@ public class RobotPlayer{
 	}
 	
 	private static void makeEncampment() throws GameActionException{
+		// First, check whether we are blocking in the HQ
 		MapLocation home = rc.senseHQLocation();
-		MapLocation away = rc.senseEnemyHQLocation();
-		
-		while(rc.senseCaptureCost()>rc.getTeamPower()){
-			hold();
+		if(home.distanceSquaredTo(rc.getLocation())<3){
+			int freeSpaces = 0;
+			for(Direction dir: dirs){
+				if(rc.senseObjectAtLocation(home.add(dir))==null && rc.senseTerrainTile(home.add(dir))==TerrainTile.LAND)
+					++freeSpaces;
+			}
+			// If we are, move randomly.
+			if(freeSpaces<2){
+				moveRandomly();
+				return;
+			}
 		}
 		
-		// Check whether we are inside an ellipse with foci at the two HQs
-		if(Math.sqrt(rc.getLocation().distanceSquaredTo(home))+Math.sqrt(rc.getLocation().distanceSquaredTo(away))>
-				Math.sqrt(home.distanceSquaredTo(away))+5){
+		int timeoutCounter = 0;
+		while(rc.senseCaptureCost()>rc.getTeamPower()){
+			rc.yield();
+			++timeoutCounter;
+			if(timeoutCounter>5){
+				// No power, so give up and move away
+				moveRandomly();
+				return;
+			}
+		}
+		
+		// Are we almost out of power?
+		if(rc.getTeamPower()<rc.senseCaptureCost()+5){
+			rc.captureEncampment(RobotType.GENERATOR);
+		}else if(isOutOfTheWay()){
 			// Outside
 			rc.captureEncampment(RobotType.SUPPLIER);
 			hold();
@@ -173,7 +204,7 @@ public class RobotPlayer{
 		for(int i=1;i<8;++i){
 			if(rc.canMove(dir)){
 				MapLocation destination = rc.getLocation().add(dir);
-				if(rc.senseMine(destination)==rc.getTeam() || rc.senseMine(destination)==null){
+				if(!(rc.senseMine(destination)==rc.getTeam().opponent() || rc.senseMine(destination)==Team.NEUTRAL)){
 					rc.move(dir);	
 					break;
 				}
@@ -184,6 +215,16 @@ public class RobotPlayer{
 				dir = dir.rotateRight();
 		}
 		hold();
+	}
+	
+	private static boolean isOutOfTheWay() throws GameActionException{
+		// Check whether we are inside an ellipse with foci at the two HQs
+		MapLocation home = rc.senseHQLocation();
+		MapLocation away = rc.senseEnemyHQLocation();
+		
+		return (Math.sqrt(rc.getLocation().distanceSquaredTo(home))
+				  +Math.sqrt(rc.getLocation().distanceSquaredTo(away))
+				  >Math.sqrt(home.distanceSquaredTo(away))+5);
 	}
 	
 	private static Direction pickRandomDirection(){
@@ -212,6 +253,7 @@ public class RobotPlayer{
 				}
 				rc.attackSquare(rc.senseLocationOf(targets[target]));
 			}
+			rc.yield();
 			hold();
 		}
 	}
@@ -221,10 +263,15 @@ public class RobotPlayer{
 			rc.yield();
 	}
 	
+	private static void generatorCode() throws GameActionException{
+		while(true)
+			rc.yield();
+	}
+	
 	private static void hqCode() throws GameActionException{
 		// Spawn 5 robots
 		for(int i=1;i<5;++i){
-			for (Direction c : Direction.values()){
+			for (Direction c : dirs){
 				if(rc.canMove(c)){
 					rc.spawn(c);
 					break;
@@ -240,12 +287,14 @@ public class RobotPlayer{
 		}
 		
 		// Generate more robots whenever there are fewer than 20.
-		// Research vision if we have at least 3 artillery.
+		// Research vision if we have at least 2 artillery.
 		// Otherwise, research nuke.
 		while(true){
-			if(rc.senseNearbyGameObjects(Robot.class, 1000000, rc.getTeam()).length<20 &&
-				rc.senseNearbyGameObjects(Robot.class, 2      , rc.getTeam()).length<5){
-				for (Direction c : Direction.values()){
+			if(400-rc.checkResearchProgress(Upgrade.NUKE)<50){
+				// Finish him!
+				rc.researchUpgrade(Upgrade.NUKE);
+			}else if(countActivePopulation()<20 &&	rc.senseNearbyGameObjects(Robot.class, 2, rc.getTeam()).length<9){
+				for (Direction c : dirs){
 					if(rc.canMove(c)){
 						rc.spawn(c);
 						break;
@@ -260,4 +309,17 @@ public class RobotPlayer{
 			hold();
 		}
 	}	
+	
+	private static int countActivePopulation() throws GameActionException{
+		int activePopulation = 0;
+		Robot[] population = rc.senseNearbyGameObjects(Robot.class, 1000000, rc.getTeam());
+		
+		for(Robot individual: population){
+			RobotType type = rc.senseRobotInfo(individual).type;
+			if(type==RobotType.SOLDIER || type==RobotType.ARTILLERY)
+				++activePopulation;
+		}
+		
+		return activePopulation;
+	}
 }
